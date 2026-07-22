@@ -152,6 +152,9 @@ def detect_source_from_filename(filename: str) -> str:
 
 def detect_source_and_parse(data: Dict, source_hint: str = "") -> List[Account]:
     """Auto-detect format and parse accordingly."""
+    # Unknown filenames must still use payload-based detection.
+    if source_hint == "unknown":
+        source_hint = ""
     # Try each parser, return first that yields results
     for name, parser in PARSERS.items():
         if source_hint and name != source_hint:

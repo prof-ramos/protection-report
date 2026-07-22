@@ -30,6 +30,12 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(len(accounts), 2)
         self.assertEqual(len(analyzer.cluster()["unclustered"]), 2)
 
+    def test_parses_supported_payload_with_generic_filename_hint(self):
+        payload = [{"title": "GitHub", "url": "https://github.com/user", "found": True}]
+        hint = detect_source_from_filename("input.json")
+        self.assertEqual(hint, "unknown")
+        self.assertEqual(len(detect_source_and_parse(payload, hint)), 1)
+
     def test_parses_enola_json(self):
         payload = [
             {"title": "GitHub", "url": "https://github.com/user", "found": True},
