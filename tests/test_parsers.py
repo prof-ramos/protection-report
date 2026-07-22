@@ -63,6 +63,13 @@ class ParserTests(unittest.TestCase):
         accounts = detect_source_and_parse(payload, "enola")
         self.assertEqual([(a.site, a.url) for a in accounts], [("GitHub", "https://github.com/user")])
 
+    def test_vesper_detection_precedes_generic_maigret_name(self):
+        payload = {"usernames": [{"username": "user", "results": [
+            {"site": "GitHub", "link": "https://github.com/user", "exist": True},
+        ]}]}
+        self.assertEqual(detect_source_from_filename("report_vesper_user.json"), "vesper")
+        self.assertEqual(len(detect_source_and_parse(payload, "")), 1)
+
     def test_parses_vesper_json(self):
         payload = {"usernames": [{"username": "user", "results": [
             {"site": "GitHub", "link": "https://github.com/user", "exist": True, "status": "CONFIRMED"},

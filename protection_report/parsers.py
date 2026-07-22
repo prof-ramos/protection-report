@@ -62,18 +62,19 @@ def parse_sherlock_json(data: Dict) -> List[Account]:
     return accounts
 
 
-def parse_blackbird_json(data: Dict) -> List[Account]:
+def parse_blackbird_json(data: Any) -> List[Account]:
     """Parse Blackbird JSON output."""
     accounts = []
     for entry in data if isinstance(data, list) else [data]:
-        if isinstance(entry, dict):
-            accounts.append(Account(
-                site=entry.get("site", ""),
-                url=entry.get("url", ""),
-                username=entry.get("username", ""),
-                fullname=entry.get("fullname", ""),
-                source="blackbird",
-            ))
+        if not isinstance(entry, dict) or not entry.get("site") or not (entry.get("url") or entry.get("username")):
+            continue
+        accounts.append(Account(
+            site=entry.get("site", ""),
+            url=entry.get("url", ""),
+            username=entry.get("username", ""),
+            fullname=entry.get("fullname", ""),
+            source="blackbird",
+        ))
     return accounts
 
 
@@ -135,6 +136,10 @@ PARSERS = {
 def detect_source_from_filename(filename: str) -> str:
     """Detect source tool from filename patterns."""
     name = filename.lower()
+    if "enola" in name:
+        return "enola"
+    if "vesper" in name:
+        return "vesper"
     if "maigret" in name or name.startswith("report_") or "_simple" in name:
         return "maigret"
     if "sherlock" in name:
@@ -143,10 +148,6 @@ def detect_source_from_filename(filename: str) -> str:
         return "blackbird"
     if "naminter" in name:
         return "naminter"
-    if "enola" in name:
-        return "enola"
-    if "vesper" in name:
-        return "vesper"
     return "unknown"
 
 
