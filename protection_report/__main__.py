@@ -17,6 +17,10 @@ from protection_report.parsers import detect_source_and_parse, detect_source_fro
 from protection_report.report import RiskAnalyzer, generate_report
 
 
+def safe_report_name(value: str) -> str:
+    return "".join(c if c.isalnum() or c in "._-" else "_" for c in value).strip("._") or "unknown"
+
+
 def load_json(path: str) -> dict:
     """Load and parse JSON file."""
     with open(path) as f:
@@ -47,6 +51,7 @@ def main():
             i += 1
 
     if not json_paths and username:
+        username = safe_report_name(username)
         p = f"/tmp/reports/report_{username}_simple.json"
         if Path(p).exists():
             json_paths.append(p)
@@ -57,6 +62,7 @@ def main():
 
     if not username:
         username = Path(json_paths[0]).stem.replace("report_", "").replace("_simple", "")
+    username = safe_report_name(username)
 
     # Parse all JSON files
     all_accounts = []
@@ -70,8 +76,8 @@ def main():
         source_count[source] = len(accs)
 
     # Deduplicate
-    analyzer = RiskAnalyzer(all_accounts)
-    accounts = analyzer.deduplicate(all_accounts)
+    accounts = RiskAnalyzer.deduplicate(all_accounts)
+    analyzer = RiskAnalyzer(accounts)
 
     print(f"📡 Fontes: {' | '.join(f'{k}: {v}' for k, v in source_count.items())}")
     print(f"📊 Total: {len(accounts)} contas únicas (de {len(all_accounts)} brutas)")
@@ -94,6 +100,7 @@ def main():
                 description=f"Top: {', '.join(breach_data.breaches[:5])}",
                 affected=breach_data.breaches,
             ))
+            risk_score = 10
         else:
             print("✅ Nenhum vazamento encontrado")
 
