@@ -21,7 +21,7 @@ def check_breach(email: str) -> BreachResult:
             timeout=10,
         )
         if resp.status_code != 200:
-            return BreachResult()
+            return BreachResult(error=f"HTTP {resp.status_code}")
 
         data = resp.json()
         breaches_raw = data.get("BreachesSummary", {}).get("site", "")
@@ -44,5 +44,5 @@ def check_breach(email: str) -> BreachResult:
 
     except requests.RequestException as e:
         return BreachResult(error=f"Request failed: {e}")
-    except (ValueError, KeyError, IndexError) as e:
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError) as e:
         return BreachResult(error=f"Parse failed: {e}")

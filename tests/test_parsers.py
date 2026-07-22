@@ -1,5 +1,8 @@
 import unittest
+from unittest.mock import Mock, patch
 
+import requests
+from protection_report.breach import check_breach
 from protection_report.models import Account
 from protection_report.report import RiskAnalyzer
 from protection_report.parsers import (
@@ -21,6 +24,21 @@ class ParserTests(unittest.TestCase):
             accounts = detect_source_and_parse(payload, source)
             self.assertEqual(len(accounts), 1)
             self.assertIsInstance(accounts[0], Account)
+
+    def test_breach_http_failure_is_not_clean(self):
+        response = Mock(status_code=503)
+        with patch("protection_report.breach.requests.get", return_value=response):
+            result = check_breach("user@example.test")
+        self.assertFalse(result.found)
+        self.assertIsNotNone(result.error)
+        self.assertIn("HTTP 503", result.error)
+
+    def test_breach_request_failure_is_not_clean(self):
+        with patch("protection_report.breach.requests.get", side_effect=requests.RequestException("offline")):
+            result = check_breach("user@example.test")
+        self.assertFalse(result.found)
+        self.assertIsNotNone(result.error)
+        self.assertIn("offline", result.error)
 
     def test_deduplicate_before_risk_analysis(self):
         duplicate = Account(site="GitHub", url="https://example.test/u", username="u")

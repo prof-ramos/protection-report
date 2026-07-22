@@ -102,7 +102,10 @@ def main():
             ))
             risk_score = 10
         else:
-            print("✅ Nenhum vazamento encontrado")
+            if breach_data.error:
+                print(f"⚠️  Consulta de vazamentos inconclusiva: {breach_data.error}")
+            else:
+                print("✅ Nenhum vazamento encontrado")
 
     recommendations = analyzer.recommendations(risks)
     report = generate_report(

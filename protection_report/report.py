@@ -197,6 +197,9 @@ def generate_report(
         for b in breach_data.breaches[:10]:
             r += f"- {b}\n"
         r += "\n"
+    elif breach_data and breach_data.error:
+        r += "---\n## ⚠️ Consulta de Vazamentos Inconclusiva\n\n"
+        r += f"Não foi possível confirmar a ausência de vazamentos: {breach_data.error}\n\n"
 
     # --- Account inventory ---
     r += "---\n## 📋 Contas Encontradas\n\n"
