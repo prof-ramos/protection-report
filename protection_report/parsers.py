@@ -91,11 +91,44 @@ def parse_naminter_json(data: Dict) -> List[Account]:
     return accounts
 
 
+def parse_enola_json(data: Any) -> List[Account]:
+    """Parse Enola's list of site results."""
+    if not isinstance(data, list):
+        return []
+    return [Account(
+        site=str(entry.get("title", "")),
+        url=str(entry.get("url", "")),
+        username="",
+        source="enola",
+    ) for entry in data if isinstance(entry, dict) and entry.get("found") is True and entry.get("url")]
+
+
+def parse_vesper_json(data: Any) -> List[Account]:
+    """Parse Vesper's nested JSON report, keeping only positive results."""
+    accounts = []
+    for scan in data.get("usernames", []) if isinstance(data, dict) else []:
+        if not isinstance(scan, dict):
+            continue
+        username = str(scan.get("username", ""))
+        for result in scan.get("results", []):
+            if not isinstance(result, dict) or result.get("exist") is not True or not result.get("link"):
+                continue
+            accounts.append(Account(
+                site=str(result.get("site", "")),
+                url=str(result["link"]),
+                username=username,
+                source="vesper",
+            ))
+    return accounts
+
+
 PARSERS = {
     "maigret": parse_maigret_json,
     "sherlock": parse_sherlock_json,
+    "enola": parse_enola_json,
     "blackbird": parse_blackbird_json,
     "naminter": parse_naminter_json,
+    "vesper": parse_vesper_json,
 }
 
 
@@ -110,6 +143,10 @@ def detect_source_from_filename(filename: str) -> str:
         return "blackbird"
     if "naminter" in name:
         return "naminter"
+    if "enola" in name:
+        return "enola"
+    if "vesper" in name:
+        return "vesper"
     return "unknown"
 
 

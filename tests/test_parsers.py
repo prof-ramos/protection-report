@@ -30,6 +30,24 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(len(accounts), 2)
         self.assertEqual(len(analyzer.cluster()["unclustered"]), 2)
 
+    def test_parses_enola_json(self):
+        payload = [
+            {"title": "GitHub", "url": "https://github.com/user", "found": True},
+            {"title": "GitLab", "url": "https://gitlab.com/user", "found": False},
+        ]
+        self.assertEqual(detect_source_from_filename("enola_user.json"), "enola")
+        accounts = detect_source_and_parse(payload, "enola")
+        self.assertEqual([(a.site, a.url) for a in accounts], [("GitHub", "https://github.com/user")])
+
+    def test_parses_vesper_json(self):
+        payload = {"usernames": [{"username": "user", "results": [
+            {"site": "GitHub", "link": "https://github.com/user", "exist": True, "status": "CONFIRMED"},
+            {"site": "GitLab", "link": "", "exist": False, "status": "NOT_FOUND"},
+        ]}]}
+        self.assertEqual(detect_source_from_filename("vesper_user.json"), "vesper")
+        accounts = detect_source_and_parse(payload, "vesper")
+        self.assertEqual([(a.site, a.url) for a in accounts], [("GitHub", "https://github.com/user")])
+
 
 if __name__ == "__main__":
     unittest.main()

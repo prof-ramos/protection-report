@@ -9,6 +9,8 @@ from .parsers import (
     parse_sherlock_json,
     parse_blackbird_json,
     parse_naminter_json,
+    parse_enola_json,
+    parse_vesper_json,
     detect_source_and_parse,
     detect_source_from_filename,
 )
