@@ -1,0 +1,12 @@
+[
+  {
+    "title": "GitHub",
+    "url": "https://github.com/johndoe",
+    "found": true
+  },
+  {
+    "title": "GitLab",
+    "url": "https://gitlab.com/johndoe",
+    "found": false
+  }
+]

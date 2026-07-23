@@ -11,7 +11,7 @@ import sys
 import json
 from pathlib import Path
 
-from protection_report.models import Account, Risk
+from protection_report.models import Account, Risk, ParseResult
 from protection_report.breach import check_breach
 from protection_report.parsers import detect_source_and_parse, detect_source_from_filename
 from protection_report.report import RiskAnalyzer, generate_report
@@ -57,30 +57,48 @@ def main():
             json_paths.append(p)
 
     if not json_paths:
-        print("No JSON files provided.")
+        print("No JSON files provided.", file=sys.stderr)
         sys.exit(1)
 
     if not username:
         username = Path(json_paths[0]).stem.replace("report_", "").replace("_simple", "")
     username = safe_report_name(username)
 
-    # Parse all JSON files
+    # Parse all JSON files — collect results and errors separately
     all_accounts = []
     source_count = {}
+    parse_errors = []
+
     for jp in json_paths:
-        data = load_json(jp)
+        try:
+            data = load_json(jp)
+        except (json.JSONDecodeError, OSError) as e:
+            parse_errors.append((str(jp), str(e)))
+            source_count[Path(jp).stem] = 0
+            continue
+
         source_hint = detect_source_from_filename(Path(jp).name)
-        accs = detect_source_and_parse(data, source_hint=source_hint)
-        all_accounts.extend(accs)
-        source = Path(jp).stem.replace("report_", "").replace("_simple", "")
-        source_count[source] = len(accs)
+        result = detect_source_and_parse(data, source_hint=source_hint)
+
+        label = Path(jp).stem
+        if result.error:
+            parse_errors.append((str(jp), result.error))
+            source_count[label] = 0
+        else:
+            all_accounts.extend(result.accounts)
+            source_count[label] = len(result.accounts)
+
+    # Report parse errors
+    for path, err in parse_errors:
+        print(f"⚠️  {path}: {err}", file=sys.stderr)
 
     # Deduplicate
     accounts = RiskAnalyzer.deduplicate(all_accounts)
     analyzer = RiskAnalyzer(accounts)
 
+    total_raw = sum(source_count.values())
     print(f"📡 Fontes: {' | '.join(f'{k}: {v}' for k, v in source_count.items())}")
-    print(f"📊 Total: {len(accounts)} contas únicas (de {len(all_accounts)} brutas)")
+    print(f"📊 Total: {len(accounts)} contas únicas (de {total_raw} brutas)")
 
     # Analyze
     clusters = analyzer.cluster()
@@ -103,7 +121,7 @@ def main():
             risk_score = 10
         else:
             if breach_data.error:
-                print(f"⚠️  Consulta de vazamentos inconclusiva: {breach_data.error}")
+                print(f"⚠️  Consulta de vazamentos inconclusiva: {breach_data.error}", file=sys.stderr)
             else:
                 print("✅ Nenhum vazamento encontrado")
 

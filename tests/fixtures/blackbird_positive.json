@@ -1,0 +1,19 @@
+[
+  {
+    "site": "Forum",
+    "url": "https://forum.example.com/u/johndoe",
+    "username": "johndoe",
+    "fullname": "John Doe"
+  },
+  {
+    "site": "Blog",
+    "url": "https://blog.example.com/author/john",
+    "username": "john",
+    "fullname": "John Doe"
+  },
+  {
+    "site": "OldForum",
+    "url": "",
+    "username": ""
+  }
+]

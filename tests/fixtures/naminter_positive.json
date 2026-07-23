@@ -1,0 +1,11 @@
+{
+  "Blog": {
+    "status": "Claimed",
+    "url": "https://blog.example.com/u/johndoe",
+    "username": "johndoe"
+  },
+  "Other": {
+    "status": "Not Found",
+    "url": ""
+  }
+}

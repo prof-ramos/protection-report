@@ -1,0 +1,21 @@
+{
+  "GitHub": {
+    "status": {
+      "status": "Claimed",
+      "url": "https://github.com/johndoe",
+      "username": "johndoe",
+      "ids": {
+        "fullname": "John Doe",
+        "bio": "Developer",
+        "image": "https://avatars.example.com/1"
+      },
+      "tags": ["social", "coding"]
+    }
+  },
+  "GitLab": {
+    "status": {
+      "status": "Not Found",
+      "url": ""
+    }
+  }
+}

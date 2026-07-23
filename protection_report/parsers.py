@@ -1,7 +1,19 @@
 """Format-specific parsers for each OSINT tool JSON output."""
 
 from typing import Dict, List, Any
-from .models import Account
+from .models import Account, ParseResult
+
+
+class ParserError(Exception):
+    """Base parser error."""
+
+
+class ParserFormatError(ParserError):
+    """Payload doesn't match the expected format for this parser."""
+
+
+class ParserInternalError(ParserError):
+    """Unexpected error during parsing."""
 
 
 def parse_maigret_json(data: Dict) -> List[Account]:
@@ -14,6 +26,8 @@ def parse_maigret_json(data: Dict) -> List[Account]:
       }
     }
     """
+    if not isinstance(data, dict):
+        raise ParserFormatError("maigret expects a dict, got %s" % type(data).__name__)
     accounts = []
     for site_name, site_data in data.items():
         if not isinstance(site_data, dict) or "status" not in site_data:
@@ -45,6 +59,8 @@ def parse_sherlock_json(data: Dict) -> List[Account]:
       "SiteName": { "url_user": "...", "status": "..." }
     }
     """
+    if not isinstance(data, dict):
+        raise ParserFormatError("sherlock expects a dict, got %s" % type(data).__name__)
     accounts = []
     for site_name, site_data in data.items():
         if not isinstance(site_data, dict):
@@ -64,8 +80,10 @@ def parse_sherlock_json(data: Dict) -> List[Account]:
 
 def parse_blackbird_json(data: Any) -> List[Account]:
     """Parse Blackbird JSON output."""
+    if not isinstance(data, list):
+        raise ParserFormatError("blackbird expects a list, got %s" % type(data).__name__)
     accounts = []
-    for entry in data if isinstance(data, list) else [data]:
+    for entry in data:
         if not isinstance(entry, dict) or not entry.get("site") or not (entry.get("url") or entry.get("username")):
             continue
         accounts.append(Account(
@@ -80,8 +98,10 @@ def parse_blackbird_json(data: Any) -> List[Account]:
 
 def parse_naminter_json(data: Dict) -> List[Account]:
     """Parse Naminter JSON output."""
+    if not isinstance(data, dict):
+        raise ParserFormatError("naminter expects a dict, got %s" % type(data).__name__)
     accounts = []
-    for site_name, fields in data.items() if isinstance(data, dict) else []:
+    for site_name, fields in data.items():
         if isinstance(fields, dict) and fields.get("status") == "Claimed":
             accounts.append(Account(
                 site=site_name,
@@ -95,7 +115,7 @@ def parse_naminter_json(data: Dict) -> List[Account]:
 def parse_enola_json(data: Any) -> List[Account]:
     """Parse Enola's list of site results."""
     if not isinstance(data, list):
-        return []
+        raise ParserFormatError("enola expects a list, got %s" % type(data).__name__)
     return [Account(
         site=str(entry.get("title", "")),
         url=str(entry.get("url", "")),
@@ -106,8 +126,10 @@ def parse_enola_json(data: Any) -> List[Account]:
 
 def parse_vesper_json(data: Any) -> List[Account]:
     """Parse Vesper's nested JSON report, keeping only positive results."""
+    if not isinstance(data, dict):
+        raise ParserFormatError("vesper expects a dict, got %s" % type(data).__name__)
     accounts = []
-    for scan in data.get("usernames", []) if isinstance(data, dict) else []:
+    for scan in data.get("usernames", []):
         if not isinstance(scan, dict):
             continue
         username = str(scan.get("username", ""))
@@ -151,19 +173,60 @@ def detect_source_from_filename(filename: str) -> str:
     return "unknown"
 
 
-def detect_source_and_parse(data: Dict, source_hint: str = "") -> List[Account]:
-    """Auto-detect format and parse accordingly."""
-    # Unknown filenames must still use payload-based detection.
+def detect_source_and_parse(data: Dict, source_hint: str = "") -> ParseResult:
+    """Auto-detect format and parse accordingly.
+
+    Returns a ParseResult with accounts, parser used, and optional error.
+    """
     if source_hint == "unknown":
         source_hint = ""
-    # Try each parser, return first that yields results
+
+    errors = []
+    last_good_parser = None
+
     for name, parser in PARSERS.items():
         if source_hint and name != source_hint:
             continue
         try:
             result = parser(data)
-            if result:
-                return result
-        except Exception:
+        except ParserFormatError:
+            if source_hint:
+                return ParseResult(
+                    source=source_hint,
+                    parser_used=name,
+                    accounts=[],
+                    error="Payload format not recognized by %s parser" % name,
+                )
+            errors.append("%s: format mismatch" % name)
             continue
-    return []
+        except ParserError:
+            errors.append("%s: internal error" % name)
+            continue
+        except Exception as e:
+            errors.append("%s: %s" % (name, e))
+            continue
+
+        last_good_parser = name
+
+        # Explicit source: return immediately even if empty
+        if source_hint:
+            return ParseResult(source=source_hint, parser_used=name, accounts=result)
+
+        # Auto-detect: only return non-empty
+        if result:
+            return ParseResult(source=name, parser_used=name, accounts=result)
+
+    # Nothing found
+    if last_good_parser:
+        return ParseResult(
+            source=source_hint or last_good_parser,
+            parser_used=last_good_parser,
+            accounts=[],
+        )
+
+    return ParseResult(
+        source=source_hint or "unknown",
+        parser_used=source_hint or errors[0].split(":")[0] if errors else "none",
+        accounts=[],
+        error="; ".join(errors) if errors else "No parser matched payload",
+    )

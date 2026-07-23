@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pytest
+          pip install -e .
+
+      - name: Compile all Python files
+        run: python3 -m compileall protection_report/ tests/
+
+      - name: Run tests
+        run: python3 -m pytest tests/ -v
+
+      - name: Smoke test CLI
+        run: |
+          protection-report tests/fixtures/maigret_positive.json --email test@example.com
