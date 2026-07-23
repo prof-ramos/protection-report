@@ -1,6 +1,6 @@
 """Protection Report Generator — multi-source account exposure analysis."""
 
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 
 from .models import Account, Risk, BreachResult, ParseResult, normalize_url
 from .breach import check_breach
@@ -13,12 +13,17 @@ from .parsers import (
     parse_vesper_json,
     detect_source_and_parse,
     detect_source_from_filename,
-    ParserError,
-    ParserFormatError,
-    ParserInternalError,
     register_parser,
     get_parser,
     list_parsers,
     ParserMeta,
 )
-from .report import generate_report, generate_html, RiskAnalyzer, deduplicate, recommendations
+from .report import (
+    generate_report,
+    generate_html,
+    RiskAnalyzer,
+    deduplicate,
+    recommendations,
+    normalize_name,
+    SCORE_RULES,
+)
