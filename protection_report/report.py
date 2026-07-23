@@ -5,7 +5,7 @@ import html
 import unicodedata
 from datetime import datetime
 from typing import Dict, List, Optional, Any
-from .models import Account, Cluster, Risk, BreachResult, Report, ScoreBreakdownItem
+from .models import Account, Risk, BreachResult, ScoreBreakdownItem
 
 
 def esc(s: Any) -> str:
