@@ -25,7 +25,7 @@ from protection_report import VERSION
 from protection_report.models import Risk
 from protection_report.breach import check_breach
 from protection_report.parsers import detect_source_and_parse, detect_source_from_filename
-from protection_report.report import RiskAnalyzer, generate_report, generate_html
+from protection_report.report import RiskAnalyzer, generate_report, generate_html, deduplicate, recommendations
 
 
 def safe_report_name(value: str) -> str:
@@ -128,7 +128,7 @@ def main() -> int:
     for path, err in parse_errors:
         print(f"⚠️  {path}: {err}", file=sys.stderr)
 
-    accounts = RiskAnalyzer.deduplicate(all_accounts)
+    accounts = deduplicate(all_accounts)
     analyzer = RiskAnalyzer(accounts)
 
     total_raw = sum(source_count.values())
@@ -159,7 +159,7 @@ def main() -> int:
             else:
                 print("✅ Nenhum vazamento encontrado", file=sys.stderr)
 
-    recommendations = analyzer.recommendations(risks)
+    recs = recommendations(risks)
 
     now = datetime.now().isoformat()
 
@@ -202,14 +202,14 @@ def main() -> int:
         }, ensure_ascii=False, indent=2)
     elif args.format == "html":
         output = generate_html(
-            username, accounts, clusters, risks, recommendations,
+            username, accounts, clusters, risks, recs,
             risk_score, source_count, breach_data,
             score_breakdown=analyzer.score_breakdown,
             redact=args.redact,
         )
     else:
         output = generate_report(
-            username, accounts, clusters, risks, recommendations,
+            username, accounts, clusters, risks, recs,
             risk_score, source_count, breach_data,
             score_breakdown=analyzer.score_breakdown,
         )

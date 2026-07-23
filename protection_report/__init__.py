@@ -21,4 +21,4 @@ from .parsers import (
     list_parsers,
     ParserMeta,
 )
-from .report import generate_report, generate_html, RiskAnalyzer
+from .report import generate_report, generate_html, RiskAnalyzer, deduplicate, recommendations
