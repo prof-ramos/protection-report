@@ -240,6 +240,63 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(len(clusters["unclustered"]), 1)
 
 
+class NormalizeNameAndRiskTests(unittest.TestCase):
+    def test_normalize_deaccents(self):
+        from protection_report.report import normalize_name
+        self.assertEqual(normalize_name("João"), "joao")
+
+    def test_normalize_strips_punct(self):
+        from protection_report.report import normalize_name
+        self.assertEqual(normalize_name("João (aka)"), "joao aka")
+
+    def test_normalize_empty(self):
+        from protection_report.report import normalize_name
+        self.assertEqual(normalize_name(""), "")
+        self.assertEqual(normalize_name(None), "")
+
+    def test_cluster_fuzzy_accent(self):
+        a1 = Account(site="A", url="x", username="u", fullname="João Ninguém")
+        a2 = Account(site="B", url="y", username="u", fullname="Joao Ninguem")
+        analyzer = RiskAnalyzer([a1, a2])
+        clusters = analyzer.cluster()
+        self.assertEqual(len(clusters.get("cluster_0", [])), 2)
+
+    def test_cluster_fuzzy_subset(self):
+        a1 = Account(site="A", url="x", username="u", fullname="John Michael Doe")
+        a2 = Account(site="B", url="y", username="u", fullname="John Doe")
+        analyzer = RiskAnalyzer([a1, a2])
+        clusters = analyzer.cluster()
+        # ponytail: subset match should group them
+        self.assertIn("cluster_0", clusters)
+        self.assertGreaterEqual(len(clusters["cluster_0"]), 2)
+
+    def test_score_breakdown_present(self):
+        a1 = Account(site="GitHub", url="x", username="u", fullname="John Doe")
+        analyzer = RiskAnalyzer([a1])
+        analyzer.risk_score({"cluster_0": [a1]})
+        self.assertGreater(len(analyzer.score_breakdown), 0)
+
+    def test_name_exposure_is_informational(self):
+        a1 = Account(site="GitHub", url="x", username="u", fullname="John Doe")
+        analyzer = RiskAnalyzer([a1])
+        clusters = analyzer.cluster()
+        risks = analyzer.identify_risks(clusters)
+        name_risk = [r for r in risks if "nome" in r.title.lower()]
+        self.assertEqual(len(name_risk), 1)
+        self.assertEqual(name_risk[0].category, "informational")
+        self.assertEqual(name_risk[0].confidence, "confirmed")
+
+    def test_risk_config_override(self):
+        a1 = Account(site="GitHub", url="x", username="u", fullname="John Doe")
+        # Single account → accounts_base rule (default +1)
+        analyzer = RiskAnalyzer([a1], risk_config={"accounts_base": 0})
+        score = analyzer.risk_score({"unclustered": [a1]})
+        breakdown = analyzer.score_breakdown
+        account_rules = [b for b in breakdown if b["rule"] == "accounts_base"]
+        self.assertEqual(len(account_rules), 1)
+        self.assertEqual(account_rules[0]["points"], 0)
+
+
 class NormalizeURLTests(unittest.TestCase):
     def test_trailing_slash_stripped(self):
         self.assertEqual(normalize_url("https://x.com/u/"), "https://x.com/u")
