@@ -1,7 +1,6 @@
 """Test suite for protection-report parsers, models, and CLI."""
 
 import json
-import os
 import subprocess
 import unittest
 from pathlib import Path
