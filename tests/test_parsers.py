@@ -1,7 +1,6 @@
 """Test suite for protection-report parsers, models, and CLI."""
 
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -12,7 +11,7 @@ from unittest.mock import Mock, patch
 import requests
 from protection_report.breach import check_breach
 from protection_report.models import Account, normalize_url, ParseResult
-from protection_report.report import RiskAnalyzer
+from protection_report.report import RiskAnalyzer, deduplicate
 from protection_report.parsers import (
     detect_source_and_parse,
     detect_source_from_filename,
@@ -193,7 +192,7 @@ class ParserTests(unittest.TestCase):
     def test_deduplicate_by_composite_key(self):
         a1 = Account(site="GitHub", url="https://github.com/user", username="user", source="maigret")
         a2 = Account(site="GitHub", url="https://github.com/user", username="user", source="sherlock")
-        deduped = RiskAnalyzer.deduplicate([a1, a2])
+        deduped = deduplicate([a1, a2])
         self.assertEqual(len(deduped), 1)
         self.assertIn("maigret", deduped[0].sources)
         self.assertIn("sherlock", deduped[0].sources)
@@ -201,20 +200,20 @@ class ParserTests(unittest.TestCase):
     def test_deduplicate_url_normalization(self):
         a1 = Account(site="GitHub", url="https://github.com/user/", username="user")
         a2 = Account(site="GitHub", url="https://github.com/user", username="user")
-        deduped = RiskAnalyzer.deduplicate([a1, a2])
+        deduped = deduplicate([a1, a2])
         self.assertEqual(len(deduped), 1)
 
     def test_deduplicate_case_different_sites(self):
         a1 = Account(site="GitHub", url="https://github.com/A", username="A")
         a2 = Account(site="GitLab", url="https://gitlab.com/B", username="B")
-        deduped = RiskAnalyzer.deduplicate([a1, a2])
+        deduped = deduplicate([a1, a2])
         self.assertEqual(len(deduped), 2)
 
     def test_deduplicate_order_independent(self):
         a1 = Account(site="X", url="https://x.com/u", username="u", source="maigret")
         a2 = Account(site="X", url="https://x.com/u", username="u", source="sherlock")
-        forward = RiskAnalyzer.deduplicate([a1, a2])
-        backward = RiskAnalyzer.deduplicate([a2, a1])
+        forward = deduplicate([a1, a2])
+        backward = deduplicate([a2, a1])
         self.assertEqual(len(forward), 1)
         self.assertEqual(len(backward), 1)
         self.assertEqual(set(forward[0].sources), set(backward[0].sources))

@@ -2,7 +2,7 @@
 
 VERSION = "1.0.0"
 
-from .models import Account, Cluster, Risk, BreachResult, Report, ParseResult, normalize_url
+from .models import Account, Risk, BreachResult, ParseResult, normalize_url
 from .breach import check_breach
 from .parsers import (
     parse_maigret_json,
@@ -13,12 +13,17 @@ from .parsers import (
     parse_vesper_json,
     detect_source_and_parse,
     detect_source_from_filename,
-    ParserError,
-    ParserFormatError,
-    ParserInternalError,
     register_parser,
     get_parser,
     list_parsers,
     ParserMeta,
 )
-from .report import generate_report, generate_html, RiskAnalyzer
+from .report import (
+    generate_report,
+    generate_html,
+    RiskAnalyzer,
+    deduplicate,
+    recommendations,
+    normalize_name,
+    SCORE_RULES,
+)

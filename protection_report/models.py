@@ -73,31 +73,14 @@ class ParseResult:
 
 
 @dataclass
-class Cluster:
-    """Group of accounts sharing identity data."""
-    name: str
-    accounts: List[Account]
-    primary: bool = False
-    evidence: str = "fullname_match"  # ponytail: just tracks how cluster was formed
-
-    @property
-    def size(self) -> int:
-        return len(self.accounts)
-
-    @property
-    def site_names(self) -> List[str]:
-        return [a.site for a in self.accounts]
-
-
-@dataclass
 class Risk:
     """Identified risk/vulnerability."""
     severity: str  # CRITICAL, HIGH, MEDIUM, LOW, INFO
     title: str
     description: str
     affected: List[str] = field(default_factory=list)
-    category: str = "actionable"      # ponytail: informational | actionable | incident
-    confidence: str = "medium"         # ponytail: low | medium | high | confirmed
+    category: str = "actionable"      # informational | actionable | incident
+    confidence: str = "medium"         # low | medium | high | confirmed
 
 
 @dataclass
@@ -108,17 +91,3 @@ class BreachResult:
     breaches: List[str] = field(default_factory=list)
     risk_score: int = 0
     error: Optional[str] = None
-
-
-@dataclass
-class Report:
-    """Complete protection report."""
-    username: str
-    accounts: List[Account]
-    clusters: Dict[str, List[Account]]
-    risks: List[Risk]
-    recommendations: List[str]
-    risk_score: int
-    source_count: Dict[str, int]
-    breach_data: Optional[BreachResult] = None
-    generated_at: str = ""

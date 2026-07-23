@@ -68,12 +68,10 @@ class RiskAnalyzer:
         self.accounts = accounts
         self.config = {**SCORE_RULES, **(risk_config or {})}
         self._breakdown: List[dict] = []
-        self._score: Optional[int] = None
 
     def cluster(self) -> Dict[str, List[Account]]:
         """Group accounts by normalized fullname with basic fuzzy matching."""
         clusters = {}
-        assigned = set()
 
         # Normalize all names once
         normed = []
@@ -156,8 +154,7 @@ class RiskAnalyzer:
             score += c["social_3plus"]
             self._breakdown.append({"rule": "social_3plus", "points": c["social_3plus"], "evidence": "3+ contas sociais"})
 
-        self._score = min(score, 10)
-        return self._score
+        return min(score, 10)
 
     @property
     def score_breakdown(self) -> List[dict]:
@@ -206,38 +203,38 @@ class RiskAnalyzer:
 
         return risks
 
-    @staticmethod
-    def recommendations(risks: List[Risk]) -> List[str]:
-        """Generate prioritized recommendations."""
-        recs = set()
-        for r in risks:
-            if r.severity == "CRITICAL":
-                recs.add("Remover dados sensíveis imediatamente")
-            elif r.severity == "HIGH" and r.category == "actionable":
-                recs.add("Verificar privacidade em contas financeiras")
-            elif r.severity == "MEDIUM":
-                recs.add("Revisar dados públicos em contas vinculadas")
-        if any(r.category == "informational" for r in risks):
-            recs.add("Remover nome real de perfis onde não é necessário")
-        recs.add("Verificar e-mail em vazamentos (XposedOrNot)")
-        recs.add("Usar pseudônimos em plataformas de entretenimento")
-        return list(recs)
 
-    @staticmethod
-    def deduplicate(accounts: List[Account]) -> List[Account]:
-        """Remove duplicates by composite dedup_key, merging sources."""
-        seen = {}
-        for a in accounts:
-            key = a.dedup_key
-            if key in seen:
-                existing = seen[key]
-                for s in a.sources:
-                    if s not in existing.sources:
-                        existing.sources.append(s)
-                existing.tags = list(set(existing.tags + a.tags))
-                continue
-            seen[key] = a
-        return list(seen.values())
+def recommendations(risks: List[Risk]) -> List[str]:
+    """Generate prioritized recommendations."""
+    recs = set()
+    for r in risks:
+        if r.severity == "CRITICAL":
+            recs.add("Remover dados sensíveis imediatamente")
+        elif r.severity == "HIGH" and r.category == "actionable":
+            recs.add("Verificar privacidade em contas financeiras")
+        elif r.severity == "MEDIUM":
+            recs.add("Revisar dados públicos em contas vinculadas")
+    if any(r.category == "informational" for r in risks):
+        recs.add("Remover nome real de perfis onde não é necessário")
+    recs.add("Verificar e-mail em vazamentos (XposedOrNot)")
+    recs.add("Usar pseudônimos em plataformas de entretenimento")
+    return list(recs)
+
+
+def deduplicate(accounts: List[Account]) -> List[Account]:
+    """Remove duplicates by composite dedup_key, merging sources."""
+    seen = {}
+    for a in accounts:
+        key = a.dedup_key
+        if key in seen:
+            existing = seen[key]
+            for s in a.sources:
+                if s not in existing.sources:
+                    existing.sources.append(s)
+            existing.tags = list(set(existing.tags + a.tags))
+            continue
+        seen[key] = a
+    return list(seen.values())
 
 
 def generate_report(
