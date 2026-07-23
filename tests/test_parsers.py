@@ -400,6 +400,71 @@ class CLITests(unittest.TestCase):
         # stdout should be empty with --quiet
         self.assertEqual(r.stdout.strip(), "")
 
+    def test_html_format(self):
+        r = subprocess.run(
+            ["python3", "-m", "protection_report",
+             str(self.fixture_dir / "maigret_positive.json"),
+             "--format", "html", "--stdout"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("<!DOCTYPE html>", r.stdout)
+        self.assertIn("GitHub", r.stdout)
+
+    def test_json_provenance(self):
+        r = subprocess.run(
+            ["python3", "-m", "protection_report",
+             str(self.fixture_dir / "maigret_positive.json"),
+             "--format", "json", "--stdout"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0)
+        data = json.loads(r.stdout)
+        self.assertIn("provenance", data)
+        self.assertIn("version", data["provenance"])
+        self.assertEqual(len(data["provenance"]["files"]), 1)
+
+    def test_redact_flag(self):
+        r = subprocess.run(
+            ["python3", "-m", "protection_report",
+             str(self.fixture_dir / "maigret_positive.json"),
+             "--format", "json", "--redact", "--stdout"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0)
+        data = json.loads(r.stdout)
+        # Username should be masked
+        self.assertIn("***", data["accounts"][0]["username"])
+
+
+class RegistryTests(unittest.TestCase):
+    def test_register_and_list(self):
+        from protection_report.parsers import register_parser, list_parsers, ParserMeta
+        before = len(list_parsers())
+        register_parser(ParserMeta("test_fake", lambda d: [], "0.0.1"))
+        after = len(list_parsers())
+        self.assertEqual(after, before + 1)
+
+    def test_get_parser(self):
+        from protection_report.parsers import get_parser
+        pm = get_parser("maigret")
+        self.assertIsNotNone(pm)
+        self.assertEqual(pm.name, "maigret")
+        self.assertEqual(pm.version, "0.1.0")
+
+    def test_custom_parser(self):
+        from protection_report.parsers import register_parser, get_parser, ParserMeta, detect_source_and_parse
+        def my_parse(data):
+            return [Account(site="TestSite", url="https://test.com", username="test")]
+        register_parser(ParserMeta("custom_test", my_parse, "0.0.1", priority=50))
+        pm = get_parser("custom_test")
+        result = pm.parse({})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].site, "TestSite")
+        # Cleanup: remove test parser
+        from protection_report.parsers import _registry
+        _registry.pop("custom_test", None)
+
 
 if __name__ == "__main__":
     unittest.main()
