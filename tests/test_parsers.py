@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -254,6 +255,93 @@ class NormalizeURLTests(unittest.TestCase):
 
     def test_none_returns_empty(self):
         self.assertEqual(normalize_url(None), "")
+
+
+class CLITests(unittest.TestCase):
+    def setUp(self):
+        self.fixture_dir = Path(__file__).parent / "fixtures"
+
+    def test_success_exits_0(self):
+        r = subprocess.run(
+            ["python3", "-m", "protection_report",
+             str(self.fixture_dir / "maigret_positive.json"), "-q"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0)
+
+    def test_no_files_exits_1(self):
+        r = subprocess.run(
+            ["python3", "-m", "protection_report"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("No JSON files provided", r.stderr)
+
+    def test_bad_json_exits_2(self):
+        bad = Path("/tmp/_bad_parse.json")
+        bad.write_text("{invalid json")
+        try:
+            r = subprocess.run(
+                ["python3", "-m", "protection_report", str(bad), "-q"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(r.returncode, 2)
+        finally:
+            bad.unlink()
+
+    def test_output_dir_flag(self):
+        outdir = Path("/tmp/_cli_test_out")
+        r = subprocess.run(
+            ["python3", "-m", "protection_report",
+             str(self.fixture_dir / "maigret_positive.json"),
+             "-o", str(outdir), "-q"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0)
+        self.assertTrue((outdir / "protection_maigret_positive.md").exists())
+
+    def test_username_flag(self):
+        r = subprocess.run(
+            ["python3", "-m", "protection_report",
+             str(self.fixture_dir / "maigret_positive.json"),
+             "--username", "testuser", "-q"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0)
+        self.assertTrue(Path("/tmp/reports/protection_testuser.md").exists())
+
+    def test_json_format(self):
+        r = subprocess.run(
+            ["python3", "-m", "protection_report",
+             str(self.fixture_dir / "maigret_positive.json"),
+             "--format", "json", "--stdout"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0)
+        data = json.loads(r.stdout)
+        self.assertEqual(data["username"], "maigret_positive")
+        self.assertEqual(len(data["accounts"]), 1)
+        self.assertEqual(data["accounts"][0]["site"], "GitHub")
+
+    def test_stdout_flag(self):
+        r = subprocess.run(
+            ["python3", "-m", "protection_report",
+             str(self.fixture_dir / "maigret_positive.json"),
+             "--stdout"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("# 🛡 Relatório de Proteção", r.stdout)
+
+    def test_quiet_suppresses_stdout(self):
+        r = subprocess.run(
+            ["python3", "-m", "protection_report",
+             str(self.fixture_dir / "maigret_positive.json"), "-q"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0)
+        # stdout should be empty with --quiet
+        self.assertEqual(r.stdout.strip(), "")
 
 
 if __name__ == "__main__":
