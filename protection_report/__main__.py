@@ -169,7 +169,7 @@ def main() -> int:
             "provenance": {
                 "version": VERSION,
                 "generated_at": now,
-                "risk_model": "0.5.0",
+                "risk_model": "1.0.0",
                 "files": provenance,
             },
             "username": username,
@@ -212,6 +212,7 @@ def main() -> int:
             username, accounts, clusters, risks, recommendations,
             risk_score, source_count, breach_data,
             score_breakdown=analyzer.score_breakdown,
+            redact=args.redact,
         )
 
     # Write or print

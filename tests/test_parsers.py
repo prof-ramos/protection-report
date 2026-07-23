@@ -3,6 +3,8 @@
 import json
 import os
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -104,6 +106,10 @@ class ParserTests(unittest.TestCase):
         result = detect_source_and_parse(data, "sherlock")
         self.assert_parse_result(result, 0, "sherlock")
 
+    def test_parse_sherlock_wrong_type(self):
+        result = detect_source_and_parse([], "sherlock")
+        self.assert_parse_result(result, 0, "sherlock", error=True)
+
     # --- parse — blackbird ---
 
     def test_parse_blackbird_with_fixture(self):
@@ -123,6 +129,10 @@ class ParserTests(unittest.TestCase):
         result = detect_source_and_parse(data, "naminter")
         self.assert_parse_result(result, 1, "naminter")
         self.assertEqual(result.accounts[0].site, "Blog")
+
+    def test_parse_naminter_wrong_type(self):
+        result = detect_source_and_parse([], "naminter")
+        self.assert_parse_result(result, 0, "naminter", error=True)
 
     # --- parse — enola ---
 
@@ -320,7 +330,7 @@ class CLITests(unittest.TestCase):
 
     def test_success_exits_0(self):
         r = subprocess.run(
-            ["python3", "-m", "protection_report",
+            [sys.executable, "-m", "protection_report",
              str(self.fixture_dir / "maigret_positive.json"), "-q"],
             capture_output=True, text=True,
         )
@@ -328,7 +338,7 @@ class CLITests(unittest.TestCase):
 
     def test_no_files_exits_1(self):
         r = subprocess.run(
-            ["python3", "-m", "protection_report"],
+            [sys.executable, "-m", "protection_report"],
             capture_output=True, text=True,
         )
         self.assertEqual(r.returncode, 1)
@@ -339,17 +349,29 @@ class CLITests(unittest.TestCase):
         bad.write_text("{invalid json")
         try:
             r = subprocess.run(
-                ["python3", "-m", "protection_report", str(bad), "-q"],
+                [sys.executable, "-m", "protection_report", str(bad), "-q"],
                 capture_output=True, text=True,
             )
             self.assertEqual(r.returncode, 2)
         finally:
             bad.unlink()
 
+    def test_no_accounts_found_exits_3(self):
+        empty = Path("/tmp/_empty_parse.json")
+        empty.write_text("{}")
+        try:
+            r = subprocess.run(
+                [sys.executable, "-m", "protection_report", str(empty), "-q"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(r.returncode, 3)
+        finally:
+            empty.unlink()
+
     def test_output_dir_flag(self):
         outdir = Path("/tmp/_cli_test_out")
         r = subprocess.run(
-            ["python3", "-m", "protection_report",
+            [sys.executable, "-m", "protection_report",
              str(self.fixture_dir / "maigret_positive.json"),
              "-o", str(outdir), "-q"],
             capture_output=True, text=True,
@@ -359,17 +381,17 @@ class CLITests(unittest.TestCase):
 
     def test_username_flag(self):
         r = subprocess.run(
-            ["python3", "-m", "protection_report",
+            [sys.executable, "-m", "protection_report",
              str(self.fixture_dir / "maigret_positive.json"),
              "--username", "testuser", "-q"],
             capture_output=True, text=True,
         )
         self.assertEqual(r.returncode, 0)
-        self.assertTrue(Path("/tmp/reports/protection_testuser.md").exists())
+        self.assertTrue((Path(tempfile.gettempdir()) / "reports" / "protection_testuser.md").exists())
 
     def test_json_format(self):
         r = subprocess.run(
-            ["python3", "-m", "protection_report",
+            [sys.executable, "-m", "protection_report",
              str(self.fixture_dir / "maigret_positive.json"),
              "--format", "json", "--stdout"],
             capture_output=True, text=True,
@@ -382,7 +404,7 @@ class CLITests(unittest.TestCase):
 
     def test_stdout_flag(self):
         r = subprocess.run(
-            ["python3", "-m", "protection_report",
+            [sys.executable, "-m", "protection_report",
              str(self.fixture_dir / "maigret_positive.json"),
              "--stdout"],
             capture_output=True, text=True,
@@ -392,7 +414,7 @@ class CLITests(unittest.TestCase):
 
     def test_quiet_suppresses_stdout(self):
         r = subprocess.run(
-            ["python3", "-m", "protection_report",
+            [sys.executable, "-m", "protection_report",
              str(self.fixture_dir / "maigret_positive.json"), "-q"],
             capture_output=True, text=True,
         )
@@ -402,7 +424,7 @@ class CLITests(unittest.TestCase):
 
     def test_html_format(self):
         r = subprocess.run(
-            ["python3", "-m", "protection_report",
+            [sys.executable, "-m", "protection_report",
              str(self.fixture_dir / "maigret_positive.json"),
              "--format", "html", "--stdout"],
             capture_output=True, text=True,
@@ -413,7 +435,7 @@ class CLITests(unittest.TestCase):
 
     def test_json_provenance(self):
         r = subprocess.run(
-            ["python3", "-m", "protection_report",
+            [sys.executable, "-m", "protection_report",
              str(self.fixture_dir / "maigret_positive.json"),
              "--format", "json", "--stdout"],
             capture_output=True, text=True,
@@ -426,7 +448,7 @@ class CLITests(unittest.TestCase):
 
     def test_redact_flag(self):
         r = subprocess.run(
-            ["python3", "-m", "protection_report",
+            [sys.executable, "-m", "protection_report",
              str(self.fixture_dir / "maigret_positive.json"),
              "--format", "json", "--redact", "--stdout"],
             capture_output=True, text=True,
