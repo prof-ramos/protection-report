@@ -543,6 +543,12 @@ def _build_html_css(level_color: str, dial_deg: str) -> str:
             transition: border-color 0.2s;
         }}
         .search-box:focus {{ border-color: var(--cyan); }}
+        .search-box:focus-visible,
+        .url-link:focus-visible {{
+            outline: 2px solid var(--cyan);
+            outline-offset: 2px;
+            box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+        }}
 
         table {{ width: 100%; border-collapse: collapse; margin-top: 0.5rem; }}
         th {{ text-align: left; padding: 0.75rem 1rem; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); }}
@@ -660,7 +666,7 @@ def generate_html(
         "</header>",
         "<div class='hero-grid'>",
         "  <div class='card score-card'>",
-        "    <div class='score-dial'>",
+        f"    <div class='score-dial' role='meter' aria-valuenow='{risk_score}' aria-valuemin='0' aria-valuemax='10' aria-label='Pontuação de risco: {risk_score} de 10'>",
         "      <div class='score-inner'>",
         f"       <span class='score-val'>{risk_score}</span>",
         "        <span class='score-max'>/ 10</span>",
@@ -771,7 +777,7 @@ def generate_html(
     # Account table section
     parts.append("<div class='section-header'><iconify-icon icon='lucide:users' style='color: var(--cyan);'></iconify-icon> Contas Encontradas</div>")
     parts.append("<div class='card'>")
-    parts.append("<div class='search-box-wrapper'><iconify-icon icon='lucide:search'></iconify-icon><input type='text' class='search-box' id='accountSearch' placeholder='Filtrar por plataforma, usuário ou nome...' onkeyup='filterAccounts()'></div>")
+    parts.append("<div class='search-box-wrapper'><iconify-icon icon='lucide:search' aria-hidden='true'></iconify-icon><input type='text' class='search-box' id='accountSearch' aria-label='Filtrar contas por plataforma, usuário ou nome' placeholder='Filtrar por plataforma, usuário ou nome...' onkeyup='filterAccounts()'></div>")
     parts.append("<table id='accountsTable'><thead><tr><th>Plataforma</th><th>URL</th><th>Usuário</th><th>Nome</th><th>Fonte</th></tr></thead><tbody>")
     for a in accounts:
         u = esc(a.url) if not redact else "[REDACTED]"
