@@ -249,7 +249,7 @@ def generate_report(
     risk_score: int,
     source_count: Dict[str, int],
     breach_data: Optional[BreachResult] = None,
-    score_breakdown: Optional[List[dict]] = None,
+    score_breakdown: Optional[List[ScoreBreakdownItem]] = None,
     redact: bool = False,
 ) -> str:
     """Generate a complete protection report in markdown."""
@@ -621,7 +621,7 @@ def generate_html(
     risk_score: int,
     source_count: Dict[str, int],
     breach_data: Optional[BreachResult] = None,
-    score_breakdown: Optional[List[dict]] = None,
+    score_breakdown: Optional[List[ScoreBreakdownItem]] = None,
     redact: bool = False,
 ) -> str:
     """Generate a self-contained, high-end dark cyber security HTML report with layperson guidance."""
@@ -629,9 +629,6 @@ def generate_html(
     level = "Alto" if risk_score >= 7 else "Moderado" if risk_score >= 4 else "Baixo"
     level_color = "#ef4444" if risk_score >= 7 else "#f59e0b" if risk_score >= 4 else "#10b981"
     dial_deg = str(risk_score * 36)
-
-    def esc(s):
-        return html.escape(str(s)) if s else ""
 
     disp_username = (esc(username[0]) + "***") if (redact and username) else esc(username)
     css_content = _build_html_css(level_color, dial_deg)
@@ -777,13 +774,13 @@ def generate_html(
     # Account table section
     parts.append("<div class='section-header'><iconify-icon icon='lucide:users' style='color: var(--cyan);'></iconify-icon> Contas Encontradas</div>")
     parts.append("<div class='card'>")
-    parts.append("<div class='search-box-wrapper'><iconify-icon icon='lucide:search' aria-hidden='true'></iconify-icon><input type='text' class='search-box' id='accountSearch' aria-label='Filtrar contas por plataforma, usuário ou nome' placeholder='Filtrar por plataforma, usuário ou nome...' onkeyup='filterAccounts()'></div>")
+    parts.append("<div class='search-box-wrapper'><iconify-icon icon='lucide:search' aria-hidden='true'></iconify-icon><input type='text' class='search-box' id='accountSearch' aria-label='Filtrar contas por plataforma, usuário ou nome' placeholder='Filtrar por plataforma, usuário ou nome...' oninput='filterAccounts()'></div>")
     parts.append("<table id='accountsTable'><thead><tr><th>Plataforma</th><th>URL</th><th>Usuário</th><th>Nome</th><th>Fonte</th></tr></thead><tbody>")
     for a in accounts:
         u = esc(a.url) if not redact else "[REDACTED]"
         un = (esc(a.username[0]) + "***") if (redact and a.username) else esc(a.username)
         fn = (esc(a.fullname[0]) + ". ***") if (redact and a.fullname) else esc(a.fullname)
-        link = f"<a href='{u}' target='_blank' rel='noreferrer' class='url-link' title='{u}'>{u} <iconify-icon icon='lucide:external-link' style='font-size: 0.75rem; flex-shrink: 0;'></iconify-icon></a>" if (not redact and u) else f"<span>{u}</span>"
+        link = f"<a href='{u}' target='_blank' rel='noopener noreferrer' class='url-link' title='{u}' aria-label='{u} (abre em nova aba)'>{u} <iconify-icon icon='lucide:external-link' style='font-size: 0.75rem; flex-shrink: 0;' aria-hidden='true'></iconify-icon></a>" if (not redact and u) else f"<span>{u}</span>"
         srcs = ", ".join(esc(s) for s in a.sources)
         parts.append(f"<tr><td><strong>{esc(a.site)}</strong></td><td>{link}</td><td><code>{un}</code></td><td>{fn or '-'}</td><td><span class='tag badge'>{srcs}</span></td></tr>")
     parts.append("</tbody></table></div>")
@@ -792,7 +789,7 @@ def generate_html(
     parts.append("<div class='section-header'><iconify-icon icon='lucide:check-square' style='color: var(--emerald);'></iconify-icon> Recomendações de Segurança</div>")
     parts.append("<div class='card'><ul class='rec-list'>")
     for rec in recommendations:
-        parts.append(f"<li class='rec-item'><iconify-icon icon='lucide:check-circle-2' class='rec-icon'></iconify-icon><span>{esc(rec)}</span></li>")
+        parts.append(f"<li class='rec-item'><iconify-icon icon='lucide:check-circle-2' class='rec-icon' aria-hidden='true'></iconify-icon><span>{esc(rec)}</span></li>")
     parts.append("</ul></div>")
 
     # Breach section
@@ -802,7 +799,7 @@ def generate_html(
         parts.append(f"<p style='margin-bottom: 1rem;'>O e-mail foi identificado em <strong>{esc(breach_data.count)} vazamentos</strong> (Pontuação de risco: {breach_data.risk_score}/100).</p>")
         parts.append("<div style='display: flex; flex-wrap: wrap; gap: 0.4rem;'>")
         for b in breach_data.breaches[:15]:
-            parts.append(f"<span class='tag critical'><iconify-icon icon='lucide:shield-off'></iconify-icon> {esc(b)}</span>")
+            parts.append(f"<span class='tag critical'><iconify-icon icon='lucide:shield-off' aria-hidden='true'></iconify-icon> {esc(b)}</span>")
         parts.append("</div></div>")
 
     # Footer
@@ -815,7 +812,8 @@ def generate_html(
     parts.append("""
     function filterAccounts() {
         const input = document.getElementById('accountSearch');
-        const filter = input.value.toLowerCase();
+        const filterRaw = input.value;
+        const filter = filterRaw.toLowerCase();
         const table = document.getElementById('accountsTable');
         const tbody = table.getElementsByTagName('tbody')[0];
         const trs = tbody.getElementsByTagName('tr');
@@ -831,14 +829,21 @@ def generate_html(
 
         let noResultsRow = document.getElementById('noResultsRow');
         if (visibleCount === 0) {
+            const msg = 'Nenhuma conta encontrada para "' + filterRaw + '"';
             if (!noResultsRow) {
                 noResultsRow = document.createElement('tr');
                 noResultsRow.id = 'noResultsRow';
-                noResultsRow.innerHTML = `<td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-muted);">Nenhuma conta encontrada para "${filter}"</td>`;
+                const td = document.createElement('td');
+                td.colSpan = 5;
+                td.style.textAlign = 'center';
+                td.style.padding = '2rem';
+                td.style.color = 'var(--text-muted)';
+                td.textContent = msg;
+                noResultsRow.appendChild(td);
                 tbody.appendChild(noResultsRow);
             } else {
                 noResultsRow.style.display = '';
-                noResultsRow.cells[0].innerText = `Nenhuma conta encontrada para "${filter}"`;
+                noResultsRow.cells[0].textContent = msg;
             }
         } else if (noResultsRow) {
             noResultsRow.style.display = 'none';
