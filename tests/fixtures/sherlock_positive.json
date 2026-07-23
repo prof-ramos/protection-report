@@ -1,0 +1,17 @@
+{
+  "GitHub": {
+    "url_user": "https://github.com/johndoe",
+    "status": "Claimed",
+    "username": "johndoe"
+  },
+  "GitLab": {
+    "url_user": "https://gitlab.com/johndoe",
+    "status": "Detected",
+    "username": "johndoe"
+  },
+  "Twitter": {
+    "url_user": "",
+    "status": "Not Found",
+    "username": ""
+  }
+}

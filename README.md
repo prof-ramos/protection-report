@@ -1,5 +1,7 @@
 # Protection Report
 
+[![CI](https://github.com/prof-ramos/protection-report/actions/workflows/ci.yml/badge.svg)](https://github.com/prof-ramos/protection-report/actions/workflows/ci.yml)
+
 Gera relatórios de exposição de identidade a partir de resultados JSON de ferramentas OSINT.
 
 O projeto normaliza resultados de Maigret, Sherlock, Blackbird e Naminter, deduplica contas, calcula risco, agrupa evidências por identidade e pode consultar vazamentos no XposedOrNot.

@@ -109,14 +109,22 @@ class RiskAnalyzer:
 
     @staticmethod
     def deduplicate(accounts: List[Account]) -> List[Account]:
-        """Remove duplicate accounts by URL."""
-        seen = set()
-        result = []
+        """Remove duplicates by composite dedup_key, merging sources."""
+        seen = {}
         for a in accounts:
-            if a.unique_key not in seen:
-                seen.add(a.unique_key)
-                result.append(a)
-        return result
+            key = a.dedup_key
+            if key in seen:
+                existing = seen[key]
+                # Merge sources
+                for s in a.sources:
+                    if s not in existing.sources:
+                        existing.sources.append(s)
+                # Keep all tags
+                existing.tags = list(set(existing.tags + a.tags))
+                # Keep first discovered url/site/username (preserve order)
+                continue
+            seen[key] = a
+        return list(seen.values())
 
 
 def generate_report(

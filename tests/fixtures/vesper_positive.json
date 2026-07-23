@@ -1,0 +1,21 @@
+{
+  "usernames": [
+    {
+      "username": "johndoe",
+      "results": [
+        {
+          "site": "GitHub",
+          "link": "https://github.com/johndoe",
+          "exist": true,
+          "status": "CONFIRMED"
+        },
+        {
+          "site": "GitLab",
+          "link": "",
+          "exist": false,
+          "status": "NOT_FOUND"
+        }
+      ]
+    }
+  ]
+}
