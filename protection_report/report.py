@@ -1,6 +1,7 @@
 """Risk analysis and report generation."""
 
 import re
+import html
 import unicodedata
 from datetime import datetime
 from collections import defaultdict
@@ -301,3 +302,85 @@ def generate_report(
 
     r += "---\n*Gerado automaticamente de dados públicos.*\n"
     return r
+
+
+def generate_html(
+    username: str,
+    accounts: List[Account],
+    clusters: Dict[str, List[Account]],
+    risks: List[Risk],
+    recommendations: List[str],
+    risk_score: int,
+    source_count: Dict[str, int],
+    breach_data: Optional[BreachResult] = None,
+    score_breakdown: Optional[List[dict]] = None,
+    redact: bool = False,
+) -> str:
+    """Generate a self-contained HTML report. Escapes all user content."""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    level = "Alto" if risk_score >= 7 else "Moderado" if risk_score >= 4 else "Baixo"
+    severity_colors = {"CRITICAL": "#dc2626", "HIGH": "#f59e0b", "MEDIUM": "#f97316",
+                       "LOW": "#9ca3af", "INFO": "#3b82f6"}
+
+    def esc(s):
+        return html.escape(str(s)) if s else ""
+
+    parts = [
+        "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'>",
+        f"<title>Proteção: {esc(username)}</title>",
+        "<style>body{font-family:system-ui,sans-serif;max-width:800px;margin:0 auto;padding:2rem;line-height:1.6}",
+        "table{border-collapse:collapse;width:100%;margin:1rem 0}",
+        "th,td{border:1px solid #e5e7eb;padding:.5rem;text-align:left}",
+        "th{background:#f9fafb} .tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;margin:2px}",
+        ".critical{color:#dc2626}.high{color:#f59e0b}.medium{color:#f97316}.low{color:#9ca3af}",
+        "</style></head><body>",
+        f"<h1>🛡 Relatório de Proteção: {esc(username)}</h1>",
+        f"<p><strong>Data:</strong> {now}</p>",
+        f"<p><strong>Contas:</strong> {len(accounts)}</p>",
+        f"<p><strong>Risco:</strong> {risk_score}/10 ({level})</p>",
+        f"<p><strong>Versão:</strong> 0.6.0</p>",
+    ]
+
+    # Score breakdown
+    if score_breakdown:
+        parts.append("<h2>Decomposição do Score</h2><ul>")
+        for b in score_breakdown:
+            parts.append(f"<li><strong>{esc(b['rule'])}</strong>: +{b['points']} — {esc(b['evidence'])}</li>")
+        parts.append("</ul>")
+
+    # Risks
+    parts.append("<h2>Riscos Identificados</h2>")
+    for risk in risks:
+        cls = risk.severity.lower()
+        parts.append(f"<div class='risk {cls}'>")
+        parts.append(f"<h3><span class='tag {cls}'>{esc(risk.severity)}</span> {esc(risk.title)}</h3>")
+        parts.append(f"<p>{esc(risk.description)}</p>")
+        parts.append(f"<p><em>{esc(risk.category)} · {esc(risk.confidence)}</em></p>")
+        parts.append(f"<p>Afetados: {', '.join(esc(a) for a in risk.affected[:5])}</p></div>")
+
+    # Clusters
+    parts.append("<h2>Clusters</h2>")
+    for cid, accs in clusters.items():
+        if cid == "unclustered":
+            continue
+        parts.append(f"<h3>{esc(cid)} ({len(accs)} contas)</h3><ul>")
+        for a in accs:
+            parts.append(f"<li>{esc(a.site)}: {esc(a.fullname) or 'N/A'}</li>")
+        parts.append("</ul>")
+
+    # Breach
+    if breach_data and breach_data.found:
+        parts.append(f"<h2>Vazamentos</h2><p>{esc(breach_data.count)} vazamentos (score {breach_data.risk_score}/100)</p>")
+
+    # Account table
+    parts.append("<h2>Contas</h2><table><tr><th>Site</th><th>URL</th><th>User</th><th>Nome</th></tr>")
+    for a in accounts:
+        u = esc(a.url) if not redact else "[REDACTED]"
+        un = esc(a.username) if not redact else esc(a.username[0]) + "***"
+        fn = esc(a.fullname) if not redact else esc(a.fullname[0]) + ". ***" if a.fullname else ""
+        parts.append(f"<tr><td>{esc(a.site)}</td><td>{u}</td><td>{un}</td><td>{fn}</td></tr>")
+    parts.append("</table>")
+
+    parts.append("<hr><p><em>Gerado automaticamente de dados públicos.</em></p>")
+    parts.append("</body></html>")
+    return "\n".join(parts)

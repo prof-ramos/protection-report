@@ -1,6 +1,6 @@
 """Format-specific parsers for each OSINT tool JSON output."""
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Callable, Optional
 from .models import Account, ParseResult
 
 
@@ -16,16 +16,45 @@ class ParserInternalError(ParserError):
     """Unexpected error during parsing."""
 
 
-def parse_maigret_json(data: Dict) -> List[Account]:
-    """Parse Maigret JSON output.
+# ponytail: metadata on each parser function, no Protocol class needed
+class ParserMeta:
+    """Minimal metadata for a registered parser."""
+    def __init__(self, name: str, parse_fn: Callable, version: str = "0.1.0",
+                 priority: int = 0, formats: Optional[List[str]] = None):
+        self.name = name
+        self.parse_fn = parse_fn
+        self.version = version
+        self.priority = priority
+        self.formats = formats or []
 
-    Format:
-    {
-      "SiteName": {
-        "status": { "status": "Claimed", "ids": { ... } }
-      }
-    }
-    """
+    def parse(self, data: Any) -> List[Account]:
+        return self.parse_fn(data)
+
+    def matches_filename(self, filename: str) -> bool:
+        """Check if filename hints at this parser. Override per parser."""
+        return False
+
+
+# ── Registry ──────────────────────────────────────────────────────────
+
+_registry: Dict[str, ParserMeta] = {}
+
+
+def register_parser(meta: ParserMeta) -> None:
+    _registry[meta.name] = meta
+
+
+def get_parser(name: str) -> Optional[ParserMeta]:
+    return _registry.get(name)
+
+
+def list_parsers() -> List[ParserMeta]:
+    return list(_registry.values())
+
+
+# ── Parsers ───────────────────────────────────────────────────────────
+
+def _parse_maigret(data: Dict) -> List[Account]:
     if not isinstance(data, dict):
         raise ParserFormatError("maigret expects a dict, got %s" % type(data).__name__)
     accounts = []
@@ -51,14 +80,7 @@ def parse_maigret_json(data: Dict) -> List[Account]:
     return accounts
 
 
-def parse_sherlock_json(data: Dict) -> List[Account]:
-    """Parse Sherlock JSON output.
-
-    Format:
-    {
-      "SiteName": { "url_user": "...", "status": "..." }
-    }
-    """
+def _parse_sherlock(data: Dict) -> List[Account]:
     if not isinstance(data, dict):
         raise ParserFormatError("sherlock expects a dict, got %s" % type(data).__name__)
     accounts = []
@@ -78,8 +100,7 @@ def parse_sherlock_json(data: Dict) -> List[Account]:
     return accounts
 
 
-def parse_blackbird_json(data: Any) -> List[Account]:
-    """Parse Blackbird JSON output."""
+def _parse_blackbird(data: Any) -> List[Account]:
     if not isinstance(data, list):
         raise ParserFormatError("blackbird expects a list, got %s" % type(data).__name__)
     accounts = []
@@ -96,8 +117,7 @@ def parse_blackbird_json(data: Any) -> List[Account]:
     return accounts
 
 
-def parse_naminter_json(data: Dict) -> List[Account]:
-    """Parse Naminter JSON output."""
+def _parse_naminter(data: Dict) -> List[Account]:
     if not isinstance(data, dict):
         raise ParserFormatError("naminter expects a dict, got %s" % type(data).__name__)
     accounts = []
@@ -112,8 +132,7 @@ def parse_naminter_json(data: Dict) -> List[Account]:
     return accounts
 
 
-def parse_enola_json(data: Any) -> List[Account]:
-    """Parse Enola's list of site results."""
+def _parse_enola(data: Any) -> List[Account]:
     if not isinstance(data, list):
         raise ParserFormatError("enola expects a list, got %s" % type(data).__name__)
     return [Account(
@@ -124,8 +143,7 @@ def parse_enola_json(data: Any) -> List[Account]:
     ) for entry in data if isinstance(entry, dict) and entry.get("found") is True and entry.get("url")]
 
 
-def parse_vesper_json(data: Any) -> List[Account]:
-    """Parse Vesper's nested JSON report, keeping only positive results."""
+def _parse_vesper(data: Any) -> List[Account]:
     if not isinstance(data, dict):
         raise ParserFormatError("vesper expects a dict, got %s" % type(data).__name__)
     accounts = []
@@ -145,78 +163,81 @@ def parse_vesper_json(data: Any) -> List[Account]:
     return accounts
 
 
-PARSERS = {
-    "maigret": parse_maigret_json,
-    "sherlock": parse_sherlock_json,
-    "enola": parse_enola_json,
-    "blackbird": parse_blackbird_json,
-    "naminter": parse_naminter_json,
-    "vesper": parse_vesper_json,
-}
+# ── Register builtins ─────────────────────────────────────────────────
 
+register_parser(ParserMeta("maigret", _parse_maigret, "0.1.0", priority=10,
+    formats=["maigret_json"]))
+register_parser(ParserMeta("sherlock", _parse_sherlock, "0.1.0", priority=10,
+    formats=["sherlock_json"]))
+register_parser(ParserMeta("blackbird", _parse_blackbird, "0.1.0", priority=10,
+    formats=["blackbird_json"]))
+register_parser(ParserMeta("naminter", _parse_naminter, "0.1.0", priority=10,
+    formats=["naminter_json"]))
+register_parser(ParserMeta("enola", _parse_enola, "0.1.0", priority=10,
+    formats=["enola_json"]))
+register_parser(ParserMeta("vesper", _parse_vesper, "0.1.0", priority=10,
+    formats=["vesper_json"]))
+
+# Backward-compat aliases — tests and external code import these directly
+parse_maigret_json = _parse_maigret
+parse_sherlock_json = _parse_sherlock
+parse_blackbird_json = _parse_blackbird
+parse_naminter_json = _parse_naminter
+parse_enola_json = _parse_enola
+parse_vesper_json = _parse_vesper
+
+
+# ── Filename detection ────────────────────────────────────────────────
 
 def detect_source_from_filename(filename: str) -> str:
-    """Detect source tool from filename patterns."""
     name = filename.lower()
-    if "enola" in name:
-        return "enola"
-    if "vesper" in name:
-        return "vesper"
-    if "maigret" in name or name.startswith("report_") or "_simple" in name:
-        return "maigret"
-    if "sherlock" in name:
-        return "sherlock"
-    if "blackbird" in name:
-        return "blackbird"
-    if "naminter" in name:
-        return "naminter"
+    for name_key in ("enola", "vesper", "maigret", "sherlock", "blackbird", "naminter"):
+        if name_key in name or (name_key == "maigret" and (name.startswith("report_") or "_simple" in name)):
+            return name_key
     return "unknown"
 
 
-def detect_source_and_parse(data: Dict, source_hint: str = "") -> ParseResult:
-    """Auto-detect format and parse accordingly.
+# ── Auto-detect + parse ───────────────────────────────────────────────
 
-    Returns a ParseResult with accounts, parser used, and optional error.
-    """
+def detect_source_and_parse(data: Dict, source_hint: str = "") -> ParseResult:
     if source_hint == "unknown":
         source_hint = ""
+
+    # Sort by priority (descending)
+    parsers = sorted(_registry.values(), key=lambda p: -p.priority)
 
     errors = []
     last_good_parser = None
 
-    for name, parser in PARSERS.items():
-        if source_hint and name != source_hint:
+    for pm in parsers:
+        if source_hint and pm.name != source_hint:
             continue
         try:
-            result = parser(data)
+            result = pm.parse(data)
         except ParserFormatError:
             if source_hint:
                 return ParseResult(
                     source=source_hint,
-                    parser_used=name,
+                    parser_used=pm.name,
                     accounts=[],
-                    error="Payload format not recognized by %s parser" % name,
+                    error="Payload format not recognized by %s parser" % pm.name,
                 )
-            errors.append("%s: format mismatch" % name)
+            errors.append("%s: format mismatch" % pm.name)
             continue
         except ParserError:
-            errors.append("%s: internal error" % name)
+            errors.append("%s: internal error" % pm.name)
             continue
         except Exception as e:
-            errors.append("%s: %s" % (name, e))
+            errors.append("%s: %s" % (pm.name, e))
             continue
 
-        last_good_parser = name
+        last_good_parser = pm.name
 
-        # Explicit source: return immediately even if empty
         if source_hint:
-            return ParseResult(source=source_hint, parser_used=name, accounts=result)
-
-        # Auto-detect: only return non-empty
+            return ParseResult(source=source_hint, parser_used=pm.name, accounts=result)
         if result:
-            return ParseResult(source=name, parser_used=name, accounts=result)
+            return ParseResult(source=pm.name, parser_used=pm.name, accounts=result)
 
-    # Nothing found
     if last_good_parser:
         return ParseResult(
             source=source_hint or last_good_parser,
