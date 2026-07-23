@@ -2,7 +2,7 @@
 
 VERSION = "0.6.0"
 
-from .models import Account, Cluster, Risk, BreachResult, Report, ParseResult, normalize_url
+from .models import Account, Risk, BreachResult, ParseResult, normalize_url
 from .breach import check_breach
 from .parsers import (
     parse_maigret_json,

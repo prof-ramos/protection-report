@@ -4,9 +4,8 @@ import re
 import html
 import unicodedata
 from datetime import datetime
-from collections import defaultdict
 from typing import Dict, List, Optional
-from .models import Account, Cluster, Risk, BreachResult, Report
+from .models import Account, Risk, BreachResult
 
 
 def normalize_name(name: str) -> str:
@@ -41,12 +40,10 @@ class RiskAnalyzer:
         self.accounts = accounts
         self.config = {**SCORE_RULES, **(risk_config or {})}
         self._breakdown: List[dict] = []
-        self._score: Optional[int] = None
 
     def cluster(self) -> Dict[str, List[Account]]:
         """Group accounts by normalized fullname with basic fuzzy matching."""
         clusters = {}
-        assigned = set()
 
         # Normalize all names once
         normed = []
@@ -129,8 +126,7 @@ class RiskAnalyzer:
             score += c["social_3plus"]
             self._breakdown.append({"rule": "social_3plus", "points": c["social_3plus"], "evidence": "3+ contas sociais"})
 
-        self._score = min(score, 10)
-        return self._score
+        return min(score, 10)
 
     @property
     def score_breakdown(self) -> List[dict]:
