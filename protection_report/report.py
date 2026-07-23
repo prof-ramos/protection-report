@@ -4,9 +4,13 @@ import re
 import html
 import unicodedata
 from datetime import datetime
-from collections import defaultdict
-from typing import Dict, List, Optional
-from .models import Account, Cluster, Risk, BreachResult, Report
+from typing import Dict, List, Optional, Any
+from .models import Account, Cluster, Risk, BreachResult, Report, ScoreBreakdownItem
+
+
+def esc(s: Any) -> str:
+    """Safely HTML-escape non-None values, converting to string."""
+    return html.escape(str(s)) if (s is not None and s != "") else ""
 
 
 def normalize_name(name: str) -> str:
@@ -271,14 +275,17 @@ def generate_report(
     if score_breakdown:
         r += "\n**Decomposição do score:**\n"
         for b in score_breakdown:
-            r += f"- {b['rule']}: +{b['points']} ({b['evidence']})\n"
+            rule_lbl = RULE_LAYPERSON_LABELS.get(b['rule'], b['rule'])
+            r += f"- {rule_lbl}: +{b['points']} ({b['evidence']})\n"
 
     # Risks
     r += "\n---\n\n## 🔴 Riscos Identificados\n\n"
     for risk in risks:
         emoji = {"CRITICAL": "🔴", "HIGH": "🟡", "MEDIUM": "🟠", "LOW": "⚪", "INFO": "ℹ️"}.get(risk.severity, "⚪")
+        cat_lbl = CATEGORY_LAYPERSON_LABELS.get(risk.category, risk.category)
+        conf_lbl = CONFIDENCE_LAYPERSON_LABELS.get(risk.confidence, risk.confidence)
         r += f"### {emoji} {risk.severity} — {risk.title}\n{risk.description}\n"
-        r += f"**Categoria:** {risk.category} | **Confiança:** {risk.confidence}\n"
+        r += f"**Categoria:** {cat_lbl} | **Confiança:** {conf_lbl}\n"
         r += f"Afetados: {', '.join(risk.affected[:5])}\n\n"
 
     # Clusters
