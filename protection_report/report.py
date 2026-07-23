@@ -33,6 +33,29 @@ SCORE_RULES = {
     "medium_threshold": 4,
 }
 
+# Human-readable labels for non-technical users
+RULE_LAYPERSON_LABELS = {
+    "accounts_10plus": "Volume alto de perfis expostos (10+ contas)",
+    "accounts_5to9": "Volume moderado de perfis expostos (5 a 9 contas)",
+    "accounts_base": "Perfis públicos detectados",
+    "multiple_names": "Diferentes nomes/pseudônimos expostos",
+    "cluster_3plus": "Múltiplas contas conectadas pelo mesmo nome",
+    "finance_tag": "Contas associadas a finanças/negócios",
+    "social_3plus": "Presença em 3+ redes sociais públicas",
+}
+
+CATEGORY_LAYPERSON_LABELS = {
+    "informational": "Dados Públicos Visíveis",
+    "actionable": "Ação Recomendada",
+    "incident": "Ação Imediata Necessária",
+}
+
+CONFIDENCE_LAYPERSON_LABELS = {
+    "confirmed": "Confirmado",
+    "high": "Alta Certeza",
+    "medium": "Confiança Média",
+}
+
 
 class RiskAnalyzer:
     """Analyzes accounts and generates risk assessment."""
@@ -310,30 +333,9 @@ def generate_report(
     return r
 
 
-def generate_html(
-    username: str,
-    accounts: List[Account],
-    clusters: Dict[str, List[Account]],
-    risks: List[Risk],
-    recommendations: List[str],
-    risk_score: int,
-    source_count: Dict[str, int],
-    breach_data: Optional[BreachResult] = None,
-    score_breakdown: Optional[List[dict]] = None,
-    redact: bool = False,
-) -> str:
-    """Generate a self-contained, high-end dark cyber security HTML report with Iconify icons."""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    level = "Alto" if risk_score >= 7 else "Moderado" if risk_score >= 4 else "Baixo"
-    level_color = "#ef4444" if risk_score >= 7 else "#f59e0b" if risk_score >= 4 else "#10b981"
-    dial_deg = str(risk_score * 36)
-
-    def esc(s):
-        return html.escape(str(s)) if s else ""
-
-    disp_username = (esc(username[0]) + "***") if (redact and username) else esc(username)
-
-    css_content = f"""
+def _build_html_css(level_color: str, dial_deg: str) -> str:
+    """Generate scoped CSS tokens, glassmorphism card styles, and PDF print rules."""
+    return f"""
         :root {{
             --bg: #0b0f19;
             --surface: #131b2e;
@@ -580,11 +582,13 @@ def generate_html(
                 color: #0f172a !important;
                 padding: 0 !important;
             }}
-            .card {{
+            .card, .risk-item, tr {{
                 background: #ffffff !important;
                 border: 1px solid #e2e8f0 !important;
                 box-shadow: none !important;
                 backdrop-filter: none !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }}
             .brand-title, .stat-num, .score-val, h1, h2, h3, th, td {{
                 color: #0f172a !important;
@@ -593,6 +597,31 @@ def generate_html(
             .search-box-wrapper {{ display: none !important; }}
         }}
     """
+
+
+def generate_html(
+    username: str,
+    accounts: List[Account],
+    clusters: Dict[str, List[Account]],
+    risks: List[Risk],
+    recommendations: List[str],
+    risk_score: int,
+    source_count: Dict[str, int],
+    breach_data: Optional[BreachResult] = None,
+    score_breakdown: Optional[List[dict]] = None,
+    redact: bool = False,
+) -> str:
+    """Generate a self-contained, high-end dark cyber security HTML report with layperson guidance."""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    level = "Alto" if risk_score >= 7 else "Moderado" if risk_score >= 4 else "Baixo"
+    level_color = "#ef4444" if risk_score >= 7 else "#f59e0b" if risk_score >= 4 else "#10b981"
+    dial_deg = str(risk_score * 36)
+
+    def esc(s):
+        return html.escape(str(s)) if s else ""
+
+    disp_username = (esc(username[0]) + "***") if (redact and username) else esc(username)
+    css_content = _build_html_css(level_color, dial_deg)
 
     parts = [
         "<!DOCTYPE html>",
@@ -658,6 +687,26 @@ def generate_html(
         "</div>",
     ]
 
+    # Executive Summary Card for Laypersons ("O que este relatório significa?")
+    layperson_explanation = (
+        "<strong>Atenção Recomendada:</strong> Foram identificados perfis públicos que conectam seu nome real a contas de redes sociais ou serviços. Recomendamos ajustar as configurações de privacidade nos serviços afetados."
+        if risk_score >= 4 else
+        "<strong>Baixa Exposição:</strong> Pouca presença pública exposta. Suas contas encontradas possuem dados básicos dispersos e baixo risco de rastreamento."
+    )
+    parts.append(
+        "<div class='card' style='margin-bottom: 2rem; border-left: 4px solid var(--cyan);'>"
+        "  <div style='display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 1.05rem; color: #fff; margin-bottom: 0.4rem;'>"
+        "    <iconify-icon icon='lucide:help-circle' style='color: var(--cyan);'></iconify-icon> O que este relatório significa?"
+        "  </div>"
+        "  <p style='font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5;'>"
+        "    Este relatório mapeou informações públicas disponíveis na internet sob seu nome de usuário para avaliar sua pegada digital e identificar potenciais vulnerabilidades."
+        "  </p>"
+        f"  <div style='margin-top: 0.75rem; font-size: 0.85rem; background: rgba(255,255,255,0.03); padding: 0.75rem 1rem; border-radius: var(--radius-md); color: var(--text-primary); border: 1px solid var(--border);'>"
+        f"    {layperson_explanation}"
+        "  </div>"
+        "</div>"
+    )
+
     # Risks section
     parts.append("<div class='section-header'><iconify-icon icon='lucide:shield-alert' style='color: var(--critical);'></iconify-icon> Riscos Identificados</div>")
     parts.append("<div class='card'>")
@@ -665,14 +714,16 @@ def generate_html(
         for risk in risks:
             cls = risk.severity.lower()
             icon_name = "lucide:alert-octagon" if risk.severity == "CRITICAL" else ("lucide:alert-triangle" if risk.severity in ("HIGH", "MEDIUM") else "lucide:info")
+            cat_label = CATEGORY_LAYPERSON_LABELS.get(risk.category, risk.category)
+            conf_label = CONFIDENCE_LAYPERSON_LABELS.get(risk.confidence, risk.confidence)
             parts.append(f"<div class='risk-item {cls}'>")
             parts.append(f"  <div style='display: flex; justify-content: space-between; align-items: center;'>")
             parts.append(f"    <div><span class='tag {cls}'><iconify-icon icon='{icon_name}'></iconify-icon> {esc(risk.severity)}</span><strong>{esc(risk.title)}</strong></div>")
-            parts.append(f"    <span class='tag badge'>{esc(risk.category)} · {esc(risk.confidence)}</span>")
+            parts.append(f"    <span class='tag badge'>{esc(cat_label)} · {esc(conf_label)}</span>")
             parts.append(f"  </div>")
             parts.append(f"  <p style='margin-top: 0.4rem; font-size: 0.875rem; color: var(--text-secondary);'>{esc(risk.description)}</p>")
             if risk.affected:
-                parts.append(f"  <div style='margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-muted);'>Afetados: {', '.join(esc(a) for a in risk.affected[:5])}</div>")
+                parts.append(f"  <div style='margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-muted);'>Plataformas afetadas: {', '.join(esc(a) for a in risk.affected[:5])}</div>")
             parts.append(f"</div>")
     else:
         parts.append("<p style='color: var(--text-muted);'>Nenhum risco relevante identificado.</p>")
@@ -681,22 +732,25 @@ def generate_html(
     # Score breakdown section
     if score_breakdown:
         parts.append("<div class='section-header'><iconify-icon icon='lucide:bar-chart-3' style='color: var(--cyan);'></iconify-icon> Decomposição do Score de Risco</div>")
-        parts.append("<div class='card'><table><tr><th>Regra</th><th>Pontos</th><th>Evidência</th></tr>")
+        parts.append("<div class='card'><table><tr><th>Fator Analisado</th><th>Impacto</th><th>Evidência Encontrada</th></tr>")
         for b in score_breakdown:
-            parts.append(f"<tr><td><code>{esc(b['rule'])}</code></td><td><strong style='color: var(--cyan);'>+{b['points']}</strong></td><td>{esc(b['evidence'])}</td></tr>")
+            rule_label = RULE_LAYPERSON_LABELS.get(b['rule'], b['rule'])
+            parts.append(f"<tr><td><strong>{esc(rule_label)}</strong></td><td><strong style='color: var(--cyan);'>+{b['points']}</strong></td><td>{esc(b['evidence'])}</td></tr>")
         parts.append("</table></div>")
 
     # Clusters section
-    parts.append("<div class='section-header'><iconify-icon icon='lucide:network' style='color: var(--cyan);'></iconify-icon> Clusters de Identidade</div>")
+    parts.append("<div class='section-header'><iconify-icon icon='lucide:network' style='color: var(--cyan);'></iconify-icon> Grupos de Identidade Vinculados</div>")
     parts.append("<div class='card'>")
     has_clusters = False
-    for cid, accs in clusters.items():
+    for idx, (cid, accs) in enumerate(clusters.items(), 1):
         if cid == "unclustered":
             continue
         has_clusters = True
-        parts.append(f"<div style='margin-bottom: 1rem;'>")
         cnt_lbl = "conta vinculada" if len(accs) == 1 else "contas vinculadas"
-        parts.append(f"  <div style='font-weight: 600; color: var(--cyan); margin-bottom: 0.3rem; display: flex; align-items: center; gap: 0.35rem;'><iconify-icon icon='lucide:git-commit'></iconify-icon> {esc(cid)} ({len(accs)} {cnt_lbl})</div>")
+        # Find display name for cluster title
+        cluster_name = next((a.fullname for a in accs if a.fullname), "Identidade")
+        parts.append(f"<div style='margin-bottom: 1rem;'>")
+        parts.append(f"  <div style='font-weight: 600; color: var(--cyan); margin-bottom: 0.3rem; display: flex; align-items: center; gap: 0.35rem;'><iconify-icon icon='lucide:git-commit'></iconify-icon> Perfil {idx} — {esc(cluster_name)} ({len(accs)} {cnt_lbl})</div>")
         parts.append(f"  <div style='display: flex; flex-wrap: wrap; gap: 0.5rem;'>")
         for a in accs:
             fn = (esc(a.fullname[0]) + ". ***") if (redact and a.fullname) else esc(a.fullname)
@@ -704,7 +758,7 @@ def generate_html(
         parts.append(f"  </div>")
         parts.append(f"</div>")
     if not has_clusters:
-        parts.append("<p style='color: var(--text-muted);'>Nenhum cluster de identidade formado.</p>")
+        parts.append("<p style='color: var(--text-muted);'>Nenhum perfil cruzado por dados em comum.</p>")
     parts.append("</div>")
 
     # Account table section
