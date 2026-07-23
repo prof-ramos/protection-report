@@ -40,7 +40,7 @@ protection-report input.json --format json --stdout
 | `--email` | Verifica o e-mail na base de vazamentos do XposedOrNot |
 | `--username` | Nome de usuário do relatório (detectado automaticamente se omitido) |
 | `-o, --output-dir` | Diretório de destino do relatório gerado |
-| `-f, --format` | Formato de saída: `md` (padrão), `json` ou `html` |
+| `-f, --format` | Formato de saída: `md` (padrão), `json`, `html` ou `pdf` |
 | `--redact` | Redige PII (e-mail, nome de usuário, nome completo e URLs) na saída |
 | `--stdout` | Imprime o relatório diretamente no stdout |
 | `-q, --quiet` | Suprime a saída no stdout, salvando apenas o arquivo |
