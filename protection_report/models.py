@@ -6,11 +6,7 @@ from urllib.parse import urlparse, urlunparse
 
 
 def normalize_url(url: str) -> str:
-    """Normalize URL for dedup comparison.
-
-    Strips trailing slash, lowercases scheme+netloc, drops fragments.
-    Returns empty string for falsy input.
-    """
+    """Normalize URL for dedup comparison."""
     if not url:
         return ""
     parsed = urlparse(url)
@@ -20,7 +16,7 @@ def normalize_url(url: str) -> str:
         parsed.path.rstrip("/") or "/",
         parsed.params,
         parsed.query,
-        "",  # drop fragment
+        "",
     ))
 
 
@@ -40,13 +36,11 @@ class Account:
     sources: List[str] = field(default_factory=list)
 
     def __post_init__(self):
-        """Auto-populate sources from source if empty."""
         if not self.sources and self.source:
             self.sources = [self.source]
 
     @property
     def dedup_key(self) -> tuple:
-        """Composite key: canonical URL, site, username, all lowercased."""
         return (
             normalize_url(self.url),
             self.site.lower().strip(),
@@ -55,7 +49,6 @@ class Account:
 
     @property
     def unique_key(self) -> str:
-        """Legacy dedup key — kept for backward compat."""
         return self.url or self.site
 
 
@@ -78,6 +71,7 @@ class Cluster:
     name: str
     accounts: List[Account]
     primary: bool = False
+    evidence: str = "fullname_match"  # ponytail: just tracks how cluster was formed
 
     @property
     def size(self) -> int:
@@ -91,10 +85,12 @@ class Cluster:
 @dataclass
 class Risk:
     """Identified risk/vulnerability."""
-    severity: str  # CRITICAL, HIGH, MEDIUM, LOW
+    severity: str  # CRITICAL, HIGH, MEDIUM, LOW, INFO
     title: str
     description: str
     affected: List[str] = field(default_factory=list)
+    category: str = "actionable"      # ponytail: informational | actionable | incident
+    confidence: str = "medium"         # ponytail: low | medium | high | confirmed
 
 
 @dataclass

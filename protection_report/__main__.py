@@ -147,10 +147,13 @@ def main() -> int:
             ],
             "risks": [
                 {"severity": r.severity, "title": r.title,
-                 "description": r.description, "affected": r.affected}
+                 "description": r.description, "affected": r.affected,
+                 "category": r.category, "confidence": r.confidence}
                 for r in risks
             ],
             "risk_score": risk_score,
+            "score_breakdown": analyzer.score_breakdown,
+            "risk_model_version": "0.5.0",
             "source_count": source_count,
             "breaches": {
                 "found": breach_data.found,
@@ -162,6 +165,7 @@ def main() -> int:
         output = generate_report(
             username, accounts, clusters, risks, recommendations,
             risk_score, source_count, breach_data,
+            score_breakdown=analyzer.score_breakdown,
         )
 
     # Write or print
