@@ -15,7 +15,10 @@ Exit codes:
 
 import argparse
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 from datetime import datetime
@@ -63,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--username", help="Username label for the report (auto-detected if omitted)")
     p.add_argument("--output-dir", "-o", default=None,
                    help="Output directory (default: system temp dir + reports)")
-    p.add_argument("--format", "-f", choices=["md", "json", "html"], default="md",
+    p.add_argument("--format", "-f", choices=["md", "json", "html", "pdf"], default="md",
                    help="Output format (default: md)")
     p.add_argument("--redact", action="store_true",
                    help="Redact PII in output (email, username, full name)")
@@ -72,6 +75,40 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--quiet", "-q", action="store_true",
                    help="Suppress stdout report, write file only")
     return p
+
+
+def convert_html_to_pdf(html_content: str, output_pdf_path: Path) -> bool:
+    """Convert HTML string to PDF file using system Chrome/Chromium headless."""
+    chrome_paths = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        shutil.which("google-chrome"),
+        shutil.which("chrome"),
+        shutil.which("chromium"),
+    ]
+    chrome_bin = next((p for p in chrome_paths if p and Path(p).exists()), None)
+    if not chrome_bin:
+        raise RuntimeError("Google Chrome ou Chromium é necessário para a conversão direta em PDF.")
+
+    with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as tmp_html:
+        tmp_html.write(html_content)
+        tmp_html_path = tmp_html.name
+
+    try:
+        cmd = [
+            chrome_bin,
+            "--headless",
+            "--disable-gpu",
+            "--no-sandbox",
+            f"--print-to-pdf={output_pdf_path}",
+            tmp_html_path
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        return res.returncode == 0 and output_pdf_path.exists()
+    finally:
+        if os.path.exists(tmp_html_path):
+            os.remove(tmp_html_path)
 
 
 def main() -> int:
@@ -169,7 +206,7 @@ def main() -> int:
             "provenance": {
                 "version": VERSION,
                 "generated_at": now,
-                "risk_model": "0.5.0",
+                "risk_model": "1.0.0",
                 "files": provenance,
             },
             "username": username,
@@ -200,7 +237,7 @@ def main() -> int:
                 "top": breach_data.breaches[:10],
             } if breach_data else None,
         }, ensure_ascii=False, indent=2)
-    elif args.format == "html":
+    elif args.format in ("html", "pdf"):
         output = generate_html(
             username, accounts, clusters, risks, recs,
             risk_score, source_count, breach_data,
@@ -212,17 +249,25 @@ def main() -> int:
             username, accounts, clusters, risks, recs,
             risk_score, source_count, breach_data,
             score_breakdown=analyzer.score_breakdown,
+            redact=args.redact,
         )
 
     # Write or print
     if args.stdout:
-        print(output)
+        if args.format == "pdf":
+            print("⚠️ Exportação PDF não suporta --stdout. Salve em diretório de saída.", file=sys.stderr)
+        else:
+            print(output)
     else:
         out_dir = Path(args.output_dir) if args.output_dir else Path(tempfile.gettempdir()) / "reports"
         out_dir.mkdir(parents=True, exist_ok=True)
-        ext = ".html" if args.format == "html" else (".json" if args.format == "json" else ".md")
+        ext = f".{args.format}"
         out = out_dir / f"protection_{username}{ext}"
-        out.write_text(output)
+        if args.format == "pdf":
+            convert_html_to_pdf(output, out)
+        else:
+            out.write_text(output)
+
         if not args.quiet:
             print(f"✅ Report: {out}", file=sys.stderr)
             if args.format == "md":

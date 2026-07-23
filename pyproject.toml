@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protection-report"
-version = "0.6.1"
+version = "1.0.0"
 description = "Generate OSINT identity exposure reports"
 readme = "README.md"
 requires-python = ">=3.8"

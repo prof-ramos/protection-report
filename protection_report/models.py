@@ -1,8 +1,15 @@
 """Data models for protection report system."""
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TypedDict
 from urllib.parse import urlparse, urlunparse
+
+
+class ScoreBreakdownItem(TypedDict):
+    """Entry in risk score breakdown."""
+    rule: str
+    points: int
+    evidence: str
 
 
 def normalize_url(url: str) -> str:
